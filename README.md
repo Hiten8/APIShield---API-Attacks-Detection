@@ -79,8 +79,9 @@ The overall project is designed around two complementary detection branches.
                                      v
                             Behavioural Anomaly
 
+```
 
-OpenAPI Conformance Branch
+# OpenAPI Conformance Branch
 
 The current branch receives API traffic as APIEvent objects and evaluates
 the request against the target API's OpenAPI specification.
@@ -105,7 +106,7 @@ OpenAPI Validator
                   Severity / Details
 
 
-APIEvent
+# APIEvent
 
 APIShield represents observed API traffic using an APIEvent.
 
@@ -140,7 +141,7 @@ Authentication tokens are kept in memory by the traffic client and are not
 stored inside the APIEvent.
 
 
-OpenAPI Specification
+# OpenAPI Specification
 
 The current integration target is OWASP crAPI.
 
@@ -156,7 +157,7 @@ Endpoints: 40
 
 The specification defines a bearer authentication scheme using JWT.
 
-OpenAPI Path Matching
+# OpenAPI Path Matching
 
 APIShield resolves incoming request paths against the OpenAPI paths.
 
@@ -188,7 +189,7 @@ order_id.
 
 A regression test is included for this behaviour.
 
-Conformance Validation
+# Conformance Validation
 
 The validator currently checks multiple aspects of an API request against
 the OpenAPI specification.
@@ -236,7 +237,7 @@ Severity is currently part of the conformance result and is intended to
 provide a basic indication of the security relevance of a contract
 violation.
 
-Real crAPI Integration
+# Real crAPI Integration
 
 APIShield has been integrated with a running Dockerized crAPI deployment.
 
@@ -271,12 +272,12 @@ Authorization: Bearer <JWT>
 
 Both behaviours have been tested against the real crAPI deployment.
 
-Conformance Attack Tests
+# Conformance Attack Tests
 
 The conformance branch has been tested against real crAPI traffic using
 five attack scenarios.
 
-Attack 1 — Undocumented Query Parameter
+## Attack 1 — Undocumented Query Parameter
 
 A request is sent with a query parameter that is not declared in the
 OpenAPI specification.
@@ -289,7 +290,8 @@ Expected result:
 
 UNDOCUMENTED_PARAMETER
 Severity: medium
-Attack 2 — Invalid Path Parameter Type
+
+## Attack 2 — Invalid Path Parameter Type
 
 The OpenAPI specification defines:
 
@@ -303,7 +305,8 @@ Expected result:
 
 INVALID_PARAMETER_TYPE
 Severity: medium
-Attack 3 — Missing Required Query Parameter
+
+## Attack 3 — Missing Required Query Parameter
 
 The OpenAPI specification defines required query parameters:
 
@@ -329,7 +332,8 @@ specificity issue involving:
 and:
 
 /workshop/api/shop/orders/{order_id}
-Attack 4 — Invalid Request Body Type
+
+## Attack 4 — Invalid Request Body Type
 
 The login request body defines:
 
@@ -354,7 +358,7 @@ Severity: high
 This test also verified that the traffic client can send an
 unauthenticated request to the login endpoint.
 
-Attack 5 — Unsupported HTTP Method
+## Attack 5 — Unsupported HTTP Method
 
 The OpenAPI specification defines operations for:
 
@@ -381,7 +385,7 @@ Severity: high
 The violation message identifies that the HTTP method is not defined for
 the endpoint.
 
-Testing
+# Testing
 
 The project currently has a unit and integration test suite.
 
@@ -416,7 +420,7 @@ A successful run should report:
 
 The exact number may increase as new project functionality is added.
 
-Project Structure
+# Project Structure
 
 The current project is organized approximately as follows:
 
@@ -458,7 +462,7 @@ APIShield/
 The behavioural/GNN components will be added in subsequent development
 phases.
 
-Environment
+# Environment
 
 APIShield is currently developed and tested using Python 3.13.
 
@@ -503,7 +507,7 @@ conformance attack testing
 The target deployment should be running before executing tests that require
 live crAPI traffic.
 
-Current Development Checkpoint
+# Current Development Checkpoint
 
 The OpenAPI conformance branch is currently considered the first completed
 baseline of APIShield.
@@ -532,7 +536,7 @@ Violation + Severity
 
 The branch has been validated using real requests against Dockerized crAPI.
 
-Next Development Phase
+# Next Development Phase
 
 The next phase is the Behavioural / GNN branch.
 
@@ -563,3 +567,35 @@ normal-user API traffic.
 
 The resulting traffic will form the basis for constructing per-user API
 call graphs before introducing graph-based anomaly detection.
+
+# CrAPI Setup
+
+## Clone APIShield
+git clone <YOUR-GITHUB-REPO-URL>
+cd APIShield
+
+## Create Python environment
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+
+## Install APIShield
+python -m pip install --upgrade pip
+pip install -e .
+
+## Download OWASP crAPI
+mkdir targets
+cd targets
+curl.exe -L -o crapi.zip https://github.com/OWASP/crAPI/archive/refs/heads/main.zip
+tar -xf .\crapi.zip
+cd ..
+
+## Start crAPI with Docker
+cd targets\crAPI-main\deploy\docker
+docker compose pull
+docker compose -f docker-compose.yml --compatibility up -d
+
+## Return to APIShield
+cd ..\..\..\..
+
+## Run APIShield tests
+pytest
