@@ -1,0 +1,58 @@
+openapi: 3.0.3
+
+info:
+  title: APIShield Test API
+  version: "1.0.0"
+
+paths:
+
+  /api/users/{id}:
+    get:
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+
+        - name: include
+          in: query
+          required: false
+          schema:
+            type: string
+
+      responses:
+        "200":
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user_id:
+                    type: integer
+                  username:
+                    type: string
+                    
+  /api/users:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - username
+                - email
+              properties:
+                username:
+                  type: string
+
+                email:
+                  type: string
+
+      responses:
+        "201":
+          description: User created

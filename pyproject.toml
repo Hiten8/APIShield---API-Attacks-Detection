@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "apishield"
+version = "0.1.0"
+description = "API security framework combining OpenAPI conformance and GNN behavioural anomaly detection"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "httpx",
+    "pydantic",
+    "pyyaml",
+    "python-dotenv",
+    "openapi-spec-validator",
+    "jsonschema",
+    "networkx",
+    "numpy",
+    "pandas"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest"
+]
+
+ml = [
+    "torch",
+    "torch-geometric"
+]
+
+traffic = [
+    "locust"
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
