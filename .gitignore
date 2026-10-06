@@ -153,3 +153,6 @@ docker-data/
 
 # External vulnerable API targets
 targets/crAPI-main/
+
+#fastview
+fastview/

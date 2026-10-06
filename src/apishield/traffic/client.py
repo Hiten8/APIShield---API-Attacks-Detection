@@ -26,6 +26,28 @@ class TargetAPIClient:
         self._user_id: str | None = None
         self._role: str | None = None
 
+    def apply_session(
+        self,
+        token: str,
+        *,
+        user_id: str | None = None,
+        role: str | None = None,
+    ) -> None:
+        """Attach an auth token for subsequent authenticated requests."""
+
+        self._token = token
+
+        if user_id is not None:
+            self._user_id = user_id
+
+        if role is not None:
+            self._role = role
+
+    def clear_session(self) -> None:
+        self._token = None
+        self._user_id = None
+        self._role = None
+
     async def login(
         self,
         email: str,
