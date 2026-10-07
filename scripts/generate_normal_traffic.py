@@ -26,7 +26,7 @@ from apishield.traffic.workflows import (
 
 
 DEFAULT_LOGINS = ROOT.parent / "test_logins.json"
-DEFAULT_SHOP_OUTPUT = ROOT / "data" / "raw" / "shop_sessions.jsonl"
+DEFAULT_SHOP_OUTPUT = ROOT / "data" / "raw" / "shop_sessions2.jsonl"
 DEFAULT_VEHICLE_OUTPUT = ROOT / "data" / "raw" / "vehicle_sessions.jsonl"
 
 
