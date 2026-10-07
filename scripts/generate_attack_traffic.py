@@ -2,7 +2,6 @@
 Generate shop attack traffic for APIShield behavioural training.
 
 Example:
-  python scripts/generate_attack_traffic.py --num-sessions 10 --attack both
   python scripts/generate_attack_traffic.py --num-sessions 5 --attack enumeration
   python scripts/generate_attack_traffic.py --num-sessions 5 --attack flooder
   python scripts/generate_attack_traffic.py --num-sessions 10 --attack bola --max-targets 5
@@ -33,11 +32,11 @@ from apishield.traffic.attacks import (
 
 
 DEFAULT_LOGINS = ROOT.parent / "test_logins.json"
-DEFAULT_ENUM_OUTPUT = ROOT / "data" / "raw" / "shop_order_enumeration.jsonl"
-DEFAULT_FLOOD_OUTPUT = ROOT / "data" / "raw" / "shop_order_flooder.jsonl"
-DEFAULT_BOLA_OUTPUT = ROOT / "data" / "raw" / "shop_order_bola.jsonl"
-DEFAULT_BFLA_OUTPUT = ROOT / "data" / "raw" / "shop_workshop_bfla.jsonl"
-DEFAULT_OWNERSHIP_OUTPUT = ROOT / "data" / "raw" / "order_ownership.json"
+DEFAULT_ENUM_OUTPUT = ROOT / "data" / "raw" / "shop_order_enumeration_2.jsonl"
+DEFAULT_FLOOD_OUTPUT = ROOT / "data" / "raw" / "shop_order_flooder_2.jsonl"
+DEFAULT_BOLA_OUTPUT = ROOT / "data" / "raw" / "shop_order_bola_2.jsonl"
+DEFAULT_BFLA_OUTPUT = ROOT / "data" / "raw" / "shop_workshop_bfla_2.jsonl"
+DEFAULT_OWNERSHIP_OUTPUT = ROOT / "data" / "raw" / "order_ownership_2.json"
 
 
 def load_logins(path: Path) -> list[dict[str, str]]:
