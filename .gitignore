@@ -84,21 +84,6 @@ Desktop.ini
 *~
 
 # ============================================================
-# Project-generated data
-# ============================================================
-
-data/raw/*
-data/processed/*
-data/graphs/*
-data/generated/*
-
-# Keep directory structure
-!data/raw/.gitkeep
-!data/processed/.gitkeep
-!data/graphs/.gitkeep
-!data/generated/.gitkeep
-
-# ============================================================
 # Temporary files
 # ============================================================
 
@@ -154,5 +139,3 @@ docker-data/
 # External vulnerable API targets
 targets/crAPI-main/
 
-#fastview
-fastview/

@@ -1,0 +1,102 @@
+{
+  "collected_at": "2026-10-05T15:59:32.656820+00:00",
+  "base_url": "http://localhost:8888",
+  "users": {
+    "hikari_yamada": {
+      "email": "yamada@example.com",
+      "order_ids": [
+        24,
+        19,
+        13,
+        7,
+        6
+      ],
+      "order_count": 5,
+      "login_status": 200
+    },
+    "naruto_uzumaki": {
+      "email": "naruto@example.com",
+      "order_ids": [
+        25,
+        14
+      ],
+      "order_count": 2,
+      "login_status": 200
+    },
+    "rohit": {
+      "email": "rohit@example.com",
+      "order_ids": [
+        26,
+        20,
+        8
+      ],
+      "order_count": 3,
+      "login_status": 200
+    },
+    "sakura_haruno": {
+      "email": "sakura@example.com",
+      "order_ids": [
+        30,
+        21,
+        9
+      ],
+      "order_count": 3,
+      "login_status": 200
+    },
+    "sasuke_uchiha": {
+      "email": "sasuke@example.com",
+      "order_ids": [
+        27,
+        10
+      ],
+      "order_count": 2,
+      "login_status": 200
+    },
+    "kakashi_hatake": {
+      "email": "kakashi@example.com",
+      "order_ids": [
+        28,
+        15
+      ],
+      "order_count": 2,
+      "login_status": 200
+    },
+    "shikamaru_nara": {
+      "email": "shikamaru@example.com",
+      "order_ids": [
+        29,
+        22,
+        16
+      ],
+      "order_count": 3,
+      "login_status": 200
+    },
+    "ino_yamanaka": {
+      "email": "ino@example.com",
+      "order_ids": [
+        31,
+        11
+      ],
+      "order_count": 2,
+      "login_status": 200
+    },
+    "shino_aburame": {
+      "email": "shino@example.com",
+      "order_ids": [
+        17
+      ],
+      "order_count": 1,
+      "login_status": 200
+    },
+    "kiba_inuzuka": {
+      "email": "kiba@example.com",
+      "order_ids": [
+        23,
+        18,
+        12
+      ],
+      "order_count": 3,
+      "login_status": 200
+    }
+  }
+}

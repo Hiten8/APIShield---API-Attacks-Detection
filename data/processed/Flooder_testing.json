@@ -1,0 +1,136 @@
+{
+  "tau": 0.5087971846775039,
+  "window_size": 16,
+  "stride": 8,
+  "idle_gap_s": 60.0,
+  "session_count": 10,
+  "flagged_count": 10,
+  "sessions": [
+    {
+      "session_id": "0c174ae7-5046-4861-9317-0a86a4333e97",
+      "user_id": "ino_yamanaka",
+      "event_count": 38,
+      "window_count": 4,
+      "max_attack_score": 0.7486310418565787,
+      "flagged": true,
+      "window_scores": [
+        0.6775211352119666,
+        0.7483650936438893,
+        0.7486310418565787,
+        0.7272056153194197
+      ]
+    },
+    {
+      "session_id": "1419496d-8f07-4b99-a13c-1545018216e5",
+      "user_id": "hikari_yamada",
+      "event_count": 17,
+      "window_count": 2,
+      "max_attack_score": 0.7225464719663344,
+      "flagged": true,
+      "window_scores": [
+        0.6821695585837214,
+        0.7225464719663344
+      ]
+    },
+    {
+      "session_id": "48abea82-ccbf-4448-94a1-c80be33ff0cc",
+      "user_id": "shino_aburame",
+      "event_count": 32,
+      "window_count": 3,
+      "max_attack_score": 0.747762109753691,
+      "flagged": true,
+      "window_scores": [
+        0.6758639258144492,
+        0.747762109753691,
+        0.7361045315258092
+      ]
+    },
+    {
+      "session_id": "4e11b76e-6b72-4fe2-ac9c-7b2fbbd1d56b",
+      "user_id": "sasuke_uchiha",
+      "event_count": 12,
+      "window_count": 1,
+      "max_attack_score": 0.6905776690226564,
+      "flagged": true,
+      "window_scores": [
+        0.6905776690226564
+      ]
+    },
+    {
+      "session_id": "72ee2844-4235-4458-8aba-e6cd0248197b",
+      "user_id": "sakura_haruno",
+      "event_count": 30,
+      "window_count": 3,
+      "max_attack_score": 0.7474490413944909,
+      "flagged": true,
+      "window_scores": [
+        0.6867385884938157,
+        0.7474490413944909,
+        0.7391142456076755
+      ]
+    },
+    {
+      "session_id": "7f6c7cdf-f688-44e6-b7c1-6f8840825cd6",
+      "user_id": "kakashi_hatake",
+      "event_count": 36,
+      "window_count": 4,
+      "max_attack_score": 0.7472002344833808,
+      "flagged": true,
+      "window_scores": [
+        0.7072044656519378,
+        0.7472002344833808,
+        0.7469109078676391,
+        0.7370809172340795
+      ]
+    },
+    {
+      "session_id": "8fd65a40-b347-4f51-8e60-cc4dba81ead0",
+      "user_id": "kiba_inuzuka",
+      "event_count": 19,
+      "window_count": 2,
+      "max_attack_score": 0.7250810566226679,
+      "flagged": true,
+      "window_scores": [
+        0.6773660923366622,
+        0.7250810566226679
+      ]
+    },
+    {
+      "session_id": "9dc77ff8-9139-4640-adbf-f889010ded29",
+      "user_id": "naruto_uzumaki",
+      "event_count": 20,
+      "window_count": 2,
+      "max_attack_score": 0.728158338550254,
+      "flagged": true,
+      "window_scores": [
+        0.6765777199800346,
+        0.728158338550254
+      ]
+    },
+    {
+      "session_id": "a11d196e-4cd7-4889-94b7-6172f46cd701",
+      "user_id": "shikamaru_nara",
+      "event_count": 33,
+      "window_count": 4,
+      "max_attack_score": 0.748912024380101,
+      "flagged": true,
+      "window_scores": [
+        0.7118075138164018,
+        0.7480838397437364,
+        0.748912024380101,
+        0.748856001520053
+      ]
+    },
+    {
+      "session_id": "dbe19852-5443-4b2b-8618-1ae514b4a14e",
+      "user_id": "rohit",
+      "event_count": 13,
+      "window_count": 1,
+      "max_attack_score": 0.6809664951094933,
+      "flagged": true,
+      "window_scores": [
+        0.6809664951094933
+      ]
+    }
+  ]
+}

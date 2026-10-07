@@ -1,0 +1,16 @@
+{
+  "tau": 0.5087971846775039,
+  "method": "max_f1_fpr_cap",
+  "val_f1": 1.0,
+  "val_fpr": 0.0,
+  "val_window_pr_auc": 1.0,
+  "test_session_pr_auc": 1.0,
+  "test_session_roc_auc": 1.0,
+  "test_recall_by_type": {
+    "enumeration": 1.0,
+    "flooder": 1.0,
+    "bola": 1.0,
+    "bfla": 1.0
+  },
+  "seed": 42
+}
