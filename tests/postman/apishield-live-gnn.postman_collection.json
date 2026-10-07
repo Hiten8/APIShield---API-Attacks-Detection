@@ -1,0 +1,323 @@
+{
+  "info": {
+    "name": "APIShield live GNN (crAPI via :8090)",
+    "description": "Send these through the live GNN proxy (python scripts/run_live_gnn_proxy.py), NOT directly to :8888.\n\nWatch the proxy terminal: nothing is scored until 4 events in the same session (JWT email after login). FLAG* = first time session_max >= tau (~0.51).\n\nRun folders in order. After Login, {{token}} is stored automatically.\n\nCheck scores anytime: GET {{baseUrl}}/apishield/sessions",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8090" },
+    { "key": "email", "value": "yamada@example.com" },
+    { "key": "password", "value": "Q2w!Q2w!" },
+    { "key": "token", "value": "" },
+    { "key": "productId", "value": "1" }
+  ],
+  "item": [
+    {
+      "name": "0. Proxy status",
+      "item": [
+        {
+          "name": "Health (proxy only, not scored)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/apishield/health"
+          }
+        },
+        {
+          "name": "Session scores so far",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/apishield/sessions",
+            "description": "JSON: each live session's event_count, max_attack_score, flagged, window_scores."
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. Login (must do first)",
+      "item": [
+        {
+          "name": "POST login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  if (body.token) {",
+                  "    pm.collectionVariables.set('token', body.token);",
+                  "    console.log('saved token');",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": "{{baseUrl}}/identity/api/auth/login",
+            "description": "Expect 200 from crAPI and a token. Proxy log: waiting for min_events (this is event 1). Later requests must send Authorization: Bearer {{token}} so they stay one session (JWT email)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Normal shop (expect low / ok)",
+      "item": [
+        {
+          "name": "GET products",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/products"
+          }
+        },
+        {
+          "name": "GET orders/all",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/workshop/api/shop/orders/all?limit=30&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["workshop", "api", "shop", "orders", "all"],
+              "query": [
+                { "key": "limit", "value": "30" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET products again (4th event — first GNN score)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/products",
+            "description": "Login + products + orders/all + this = 4 events. Terminal should print the first window= score. Normal mix is usually ok (below tau) or borderline — compare to case 3."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Enumeration (expect FLAG*)",
+      "description": "Run this folder with Runner, delay 0ms. Many GET /orders/{id} = self-loops + short Δt. Watch FLAG* then FLAG on the proxy console.",
+      "item": [
+        {
+          "name": "GET order 1",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/orders/1"
+          }
+        },
+        {
+          "name": "GET order 2",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/orders/2"
+          }
+        },
+        {
+          "name": "GET order 3",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/orders/3"
+          }
+        },
+        {
+          "name": "GET order 4",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/orders/4"
+          }
+        },
+        {
+          "name": "GET order 5",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/orders/5"
+          }
+        },
+        {
+          "name": "GET order 6",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/orders/6"
+          }
+        },
+        {
+          "name": "GET order 7",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/orders/7"
+          }
+        },
+        {
+          "name": "GET order 8",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/orders/8"
+          }
+        },
+        {
+          "name": "GET order 9",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/orders/9"
+          }
+        },
+        {
+          "name": "GET order 10",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/shop/orders/10",
+            "description": "By here you should already have FLAG* if the session had 4+ events. Status 200 vs 403 does not matter for the GNN."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Order flooder (expect FLAG)",
+      "item": [
+        {
+          "name": "POST order A",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": {{productId}},\n  \"quantity\": 1\n}"
+            },
+            "url": "{{baseUrl}}/workshop/api/shop/orders"
+          }
+        },
+        {
+          "name": "POST order B",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": {{productId}},\n  \"quantity\": 1\n}"
+            },
+            "url": "{{baseUrl}}/workshop/api/shop/orders"
+          }
+        },
+        {
+          "name": "POST order C",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": {{productId}},\n  \"quantity\": 2\n}"
+            },
+            "url": "{{baseUrl}}/workshop/api/shop/orders"
+          }
+        },
+        {
+          "name": "POST order D",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"product_id\": {{productId}},\n  \"quantity\": 1\n}"
+            },
+            "url": "{{baseUrl}}/workshop/api/shop/orders",
+            "description": "Repeated POST /orders is the flooder shape (self-loop on POST orders). Score should stay high / FLAG."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. BFLA privileged APIs (expect FLAG)",
+      "item": [
+        {
+          "name": "GET management users/all",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/workshop/api/management/users/all?limit=10&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["workshop", "api", "management", "users", "all"],
+              "query": [
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET mechanic list",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": "{{baseUrl}}/workshop/api/mechanic/"
+          }
+        },
+        {
+          "name": "GET mechanic service_requests",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/workshop/api/mechanic/service_requests?limit=30&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["workshop", "api", "mechanic", "service_requests"],
+              "query": [
+                { "key": "limit", "value": "30" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET mechanic_report (guessed id)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }],
+            "url": {
+              "raw": "{{baseUrl}}/workshop/api/mechanic/mechanic_report?report_id=1",
+              "host": ["{{baseUrl}}"],
+              "path": ["workshop", "api", "mechanic", "mechanic_report"],
+              "query": [{ "key": "report_id", "value": "1" }]
+            },
+            "description": "400 is fine. GNN cares that a shop user hit mechanic/management nodes."
+          }
+        }
+      ]
+    }
+  ]
+}
