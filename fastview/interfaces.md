@@ -72,13 +72,29 @@ Log line shape:
 ## 3. Live reverse proxy (`run_live_gnn_proxy.py`)
 
 ASGI process listens on **:8090**, forwards each request unchanged to crAPI
-**:8888**, then scores the captured event.
+**:8888**, then runs **OpenAPI conformance** and the **rolling GNN** on that
+call. The crAPI response body is not replaced (the React app keeps working).
 
 ```text
 python scripts/run_live_gnn_proxy.py
 ```
 
 Point the React app / Postman at `http://localhost:8090` instead of `:8888`.
+
+**Per call you get**
+
+1. Response headers on the proxied crAPI reply:
+   - `X-APIShield-Conformance`: `valid` | `invalid`
+   - `X-APIShield-Violation-Count`
+   - `X-APIShield-GNN-Window` (empty until `min_events`)
+   - `X-APIShield-GNN-Session-Max`
+   - `X-APIShield-Flagged`
+   - `X-APIShield-Session`
+2. Full JSON history: `GET http://localhost:8090/apishield/calls?limit=50`
+   each item has `conformance` (endpoint template + violations) and `gnn`
+   (`window_score`, `session_max`, `flagged`, `waiting`).
+3. Console lines like `conf=ok` / `conf=INVALID(undocumented_parameter)` plus
+   `window=` / `session_max=`.
 
 | Flag | Default | Notes |
 |---|---|---|
@@ -99,11 +115,13 @@ Control endpoints (not forwarded to crAPI, not scored):
 
 ```text
 GET http://localhost:8090/apishield/health
+GET http://localhost:8090/apishield/calls
 GET http://localhost:8090/apishield/sessions
 ```
 
-`/apishield/sessions` returns current `session_max` / flagged state for live
-keys.
+`/apishield/calls` is the per-request view (conformance + GNN).
+`/apishield/sessions` still has sticky `session_max` / flagged, plus
+`last_call`.
 
 ---
 
