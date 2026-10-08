@@ -1,11 +1,13 @@
 """
-Live GNN proxy in front of crAPI.
+Live proxy in front of crAPI: OpenAPI conformance + GNN score per request.
 
 Send traffic to this process (default http://localhost:8090) instead of
-crAPI :8888. Each request is forwarded unchanged, then scored event-by-event.
+crAPI :8888. Each request is forwarded unchanged. Results are on
+X-APIShield-* response headers and GET /apishield/calls.
 
   python scripts/run_live_gnn_proxy.py
   curl http://localhost:8090/identity/api/auth/login ...
+  curl http://localhost:8090/apishield/calls
   curl http://localhost:8090/apishield/sessions
 """
 
@@ -24,6 +26,7 @@ import uvicorn
 
 from apishield.behavioral.infer import load_rolling_scorer
 from apishield.behavioral.live_proxy import create_live_app
+from apishield.conformance.openapi_loader import OpenAPILoader
 
 
 DEFAULT_CKPT = ROOT / "data" / "processed" / "behavioral_gnn.pt"
@@ -35,7 +38,10 @@ DEFAULT_SPEC = (
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Proxy live HTTP to crAPI and score each request with the GNN."
+        description=(
+            "Proxy live HTTP to crAPI. Each call is checked against the "
+            "OpenAPI spec and scored by the rolling-window GNN."
+        )
     )
     parser.add_argument("--target", default="http://localhost:8888", help="crAPI base URL")
     parser.add_argument("--host", default="0.0.0.0")
@@ -77,9 +83,14 @@ def main() -> None:
         min_events=args.min_events,
         idle_gap_s=args.idle_gap,
     )
-    app = create_live_app(scorer, target_base_url=args.target)
+    specification = OpenAPILoader().load(args.spec)
+    app = create_live_app(
+        scorer,
+        target_base_url=args.target,
+        specification=specification,
+    )
     print(
-        f"APIShield live GNN proxy -> {args.target} "
+        f"APIShield live proxy (OpenAPI + GNN) -> {args.target} "
         f"listen http://{args.host}:{args.port} "
         f"tau={scorer.threshold:.3f} N={scorer.window_size} "
         f"stride={scorer.stride} idle_gap={scorer.idle_gap_s}s",
@@ -87,7 +98,8 @@ def main() -> None:
     )
     print(
         f"Point clients at this port instead of crAPI. "
-        f"Status: http://127.0.0.1:{args.port}/apishield/sessions",
+        f"Per-call JSON: http://127.0.0.1:{args.port}/apishield/calls "
+        f"Sessions: http://127.0.0.1:{args.port}/apishield/sessions",
         flush=True,
     )
     uvicorn.run(app, host=args.host, port=args.port, log_level="info")
