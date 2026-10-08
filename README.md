@@ -1,601 +1,811 @@
 # APIShield
 
-APIShield is a cybersecurity project that combines **OpenAPI contract
-conformance validation** with **behavioural anomaly detection** for API
-traffic.
+**APIShield** is a hybrid REST API security framework that combines **OpenAPI-aware conformance validation** with **graph-based behavioral anomaly detection**.
 
-The project is being developed in two major branches:
+It addresses two complementary questions:
 
-1. **OpenAPI Conformance Validation**
-2. **Behavioural Anomaly Detection using per-user API call graphs and GNNs**
+1. **Conformance:** Does the request match the documented OpenAPI contract?
+2. **Behavior:** Does the observed API usage exhibit anomalous operational patterns?
 
-At the current development checkpoint, the OpenAPI conformance branch has
-been implemented and validated against a running OWASP crAPI deployment.
+The behavioral component represents API activity as rolling **API call graphs** and uses a two-layer **Graph Isomorphism Network with Edge features (GINE)** for binary anomaly detection.
 
-The behavioural/GNN branch has not yet been implemented.
+## Key Features
 
----
+- OpenAPI-based request conformance validation
+- Detection of undocumented parameters and endpoints
+- Detection of missing required parameters and invalid parameter types
+- Request-body validation
+- Rolling-window API call graphs
+- OpenAPI operation-level graph abstraction
+- Temporal edge features based on inter-request timing
+- Two-layer GINE behavioral detector
+- Session-level scoring using the maximum rolling-window score
+- Batch, stream/replay, and live reverse-proxy detection
+- Controlled generation of normal and attack traffic
 
-## Current Project Status
-
-### Completed
-
-- Python project scaffold
-- API event data model
-- HTTP traffic client
-- API request interception/event generation
-- OpenAPI specification loading
-- OpenAPI path matching
-- OpenAPI parameter validation
-- OpenAPI request-body validation
-- OpenAPI conformance result modelling
-- Conformance violation severity classification
-- Integration with OWASP crAPI
-- Real authenticated API traffic testing
-- Real unauthenticated API traffic testing
-- Real malformed API traffic testing
-- Conformance attack test suite
-- Path-matching regression handling
-- Automated test suite
-
-### Not Yet Implemented
-
-- Normal-user traffic generator
-- Behavioural dataset generation
-- Per-user API call sequences
-- Per-user call graphs
-- Graph feature extraction
-- GNN model
-- Behavioural anomaly scoring
-- Combined conformance + behavioural detection
-- Final APIShield detection/decision pipeline
-
----
-
-# Architecture
-
-The overall project is designed around two complementary detection branches.
+## Architecture
 
 ```text
-                    API Traffic
-                         |
-                         v
-                 +---------------+
-                 |   APIShield   |
-                 +---------------+
-                         |
-             +-----------+-----------+
-             |                       |
-             v                       v
-    OpenAPI Conformance      Behavioural Analysis
-         Branch                    Branch
-             |                       |
-             v                       v
-     Contract Validation      Per-user Call Graph
-             |                       |
-             v                       v
-      Conformance Result            GNN
-                                     |
-                                     v
-                            Behavioural Anomaly
-
+                         API Traffic
+                              |
+                              v
+                     +----------------+
+                     |  Event Capture  |
+                     +----------------+
+                              |
+                    +---------+---------+
+                    |                   |
+                    v                   v
+          +------------------+   +----------------------+
+          | OpenAPI          |   | Behavioral Detection |
+          | Conformance      |   | Branch               |
+          +------------------+   +----------------------+
+                    |                   |
+                    |                   v
+                    |          +----------------------+
+                    |          | Rolling Event Windows|
+                    |          +----------------------+
+                    |                   |
+                    |                   v
+                    |          +----------------------+
+                    |          | API Call Graphs      |
+                    |          +----------------------+
+                    |                   |
+                    |                   v
+                    |          +----------------------+
+                    |          | GINE Model           |
+                    |          +----------------------+
+                    |                   |
+                    v                   v
+             Conformance         Behavioral Score
+                Findings                |
+                    |                   |
+                    +---------+---------+
+                              |
+                              v
+                       Security Decision
 ```
 
-# OpenAPI Conformance Branch
+## OpenAPI Conformance Detection
 
-The current branch receives API traffic as APIEvent objects and evaluates
-the request against the target API's OpenAPI specification.
+The conformance branch uses the OpenAPI specification as the expected API contract. It identifies the applicable path template and HTTP operation and validates:
 
-HTTP Request
-     |
-     v
-Target API
-     |
-     v
-APIEvent
-     |
-     v
-OpenAPI Validator
-     |
-     +-------------------+
-     |                   |
-     v                   v
- Valid Request       Violations
-                         |
-                         v
-                  Severity / Details
+- Path parameters
+- Query parameters
+- Required parameters
+- Parameter types
+- Request-body structure and types
+- Supported paths and HTTP methods
+
+Example findings include undocumented query parameters, missing required parameters, invalid parameter types, invalid request bodies, unknown endpoints, and unsupported methods.
+
+Conformance validation is deterministic and interpretable. A request can nevertheless be valid according to the API contract while exhibiting malicious behavior; this motivates the behavioral branch.
+
+## Behavioral Detection
+
+### Rolling API Call Graphs
+
+API activity is grouped into overlapping event windows.
+
+Current configuration:
+
+- **Window size:** 16 events
+- **Training/batch stride:** 8
+- **Live/stream stride:** 1
+- **Session score:** maximum score across the session windows
+
+Concrete URLs are normalized to OpenAPI operation templates. For example:
+
+```text
+GET /workshop/api/shop/orders/8
+GET /workshop/api/shop/orders/26
+```
+
+are represented as:
+
+```text
+GET /workshop/api/shop/orders/{order_id}
+```
+
+Each distinct `(HTTP method, operation)` is a graph node. Directed edges connect consecutive operations, and repeated operations create self-loops.
+
+### Graph Features
+
+**Node features**
+
+1. `log1p(visit_count)`
+2. `log1p(mean_inbound_delta_t)`
+3. `log1p(min_inbound_delta_t)`
+4. `error_fraction`
+
+An OpenAPI operation identifier is also represented using an embedding.
+
+**Edge features**
+
+1. `log1p(transition_count)`
+2. `log1p(mean_delta_t)`
+3. `log1p(min_delta_t)`
+
+**Graph features**
+
+1. `log1p(event_count)`
+2. `log1p(mean_delta_t)`
+3. `log1p(min_delta_t)`
+4. `log1p(number_of_nodes)`
+5. `log1p(max_self_loop_count)`
+
+The representation emphasizes operation-level structure, transition behavior, repetition, timing, and error behavior rather than directly using object identifiers.
+
+## GINE Model
+
+The behavioral detector is a two-layer GINE model:
+
+```text
+Operation ID Embedding + Node Numeric Features
+                    |
+                    v
+             64-dim representation
+                    |
+                 GINEConv
+                    |
+                  ReLU
+                    |
+              Dropout(0.2)
+                    |
+                 GINEConv
+                    |
+                  ReLU
+                    |
+           Global Mean + Max Pool
+                    |
+              128 dimensions
+                    |
+        + 5 graph-level features
+                    |
+             133 dimensions
+                    |
+                   MLP
+                    |
+                 Logit
+                    |
+                Sigmoid
+                    |
+             Attack Score
+```
+
+The model performs binary classification:
+
+```text
+0 = Normal
+1 = Attack
+```
+
+Attack categories are retained as scenario metadata rather than separate softmax classes.
+
+Training uses Adam with learning rate `1e-3`, weighted binary cross-entropy, weighted sampling, validation PR-AUC for early stopping, and validation-based threshold selection with a false-positive-rate constraint.
+
+## Traffic Generation
+
+The evaluation environment uses **OWASP crAPI** as the target API.
+
+### Normal scenarios
+
+- Shop-user workflows
+- Vehicle-related workflows
+
+### Attack scenarios
+
+- Enumeration
+- Mass flooding
+- Broken Object Level Authorization (BOLA)
+- Broken Function Level Authorization (BFLA)
+
+Traffic is stored as JSONL event data, with labels assigned according to the generation scenario rather than inferred from HTTP status codes.
+
+## Runtime Modes
+
+### Batch
+
+Processes previously collected JSONL sessions using rolling windows.
+
+Typical configuration:
+
+```text
+Window size: 16
+Stride:      8
+Idle gap:    60 seconds
+```
+
+### Stream / Replay
+
+Processes events sequentially using a rolling buffer and scores new windows as events arrive.
+
+### Live Reverse Proxy
+
+The documented development configuration uses:
+
+```text
+APIShield proxy: http://localhost:8090
+crAPI target:    http://localhost:8888
+```
+
+The live detector maintains the latest 16 events and evaluates behavioral graphs as requests arrive.
+
+## Session Identification
+
+For live traffic, the session key is resolved in this order:
+
+1. `X-APIShield-Session`
+2. JWT `email` / `sub`
+3. Client IP address
+
+## Evaluation Dataset
+
+The documented corpus contains:
+
+| Scenario | Sessions | Windows |
+|---|---:|---:|
+| Normal shop | 50 | 58 |
+| Normal vehicle | 50 | 115 |
+| Enumeration | 31 | 164 |
+| Mass flooding | 30 | 94 |
+| BOLA | 50 | 58 |
+| BFLA | 50 | 50 |
+| **Total** | **261** | **539** |
+
+Session-level split:
+
+- Training: 183 sessions / 383 windows
+- Validation: 41 sessions / 89 windows
+- Test: 37 sessions / 67 windows
+
+## Reported Evaluation
+
+The documented controlled evaluation selected a threshold of approximately `0.5088`.
+
+Reported test results include:
+
+- Session-level PR-AUC: `1.00`
+- ROC-AUC: `1.00`
+- Enumeration recall: `1.00`
+- Mass flooding recall: `1.00`
+- BOLA recall: `1.00`
+- BFLA recall: `1.00`
+
+A separate confirmation set contained 51 sessions:
+
+- True positives: 41
+- True negatives: 10
+- False positives: 0
+- False negatives: 0
+
+These results apply to the controlled traffic used in the project and should not be interpreted as guaranteed performance on arbitrary production API traffic.
+
+## Repository Structure
+
+```text
+src/
+└── apishield/
+    ├── behavioral/
+    │   ├── windowing.py
+    │   ├── graphs.py
+    │   ├── model.py
+    │   └── infer.py
+    │
+    └── conformance/
+        ├── models.py
+        ├── path_matcher.py
+        ├── validator.py
+        ├── parameter_checker.py
+        └── body_checker.py
+
+targets/
+└── crAPI-main/
+    └── openapi-spec/
+        └── crapi-openapi-spec.json
+```
+
+Additional scripts support traffic generation, demonstrations, training, replay, and live proxy execution.
+
+## Reproducibility
+
+A typical experiment follows this sequence:
+
+1. Start the local crAPI target.
+2. Load the project OpenAPI specification.
+3. Generate or collect API event logs.
+4. Split sessions before creating overlapping windows.
+5. Build rolling API call graphs.
+6. Train the GINE behavioral model.
+7. Select the threshold using validation data.
+8. Evaluate on unseen sessions.
+9. Optionally replay the event stream or use the live reverse proxy.
+
+The exact commands and environment configuration should follow the scripts and configuration files included in the repository.
+
+## Design Considerations
+
+APIShield intentionally combines two security perspectives.
+
+**Conformance is not the same as anomaly detection.** A request can be structurally valid while its sequence, frequency, timing, or transition pattern is suspicious.
+
+**Behavioral detection is not a complete authorization oracle.** The current GINE model does not directly observe object ownership, complete authentication state, cookies, or full request-body semantics. It is therefore a complementary detection mechanism rather than a replacement for application-level authorization.
 
 
-# APIEvent
+---
 
-APIShield represents observed API traffic using an APIEvent.
+## First-Time Setup Guide
 
-An event contains information such as:
+This section is intended for a new user setting up APIShield for the first time.
 
-event ID
-timestamp
-user ID
-HTTP method
-request path
-resolved endpoint
-query parameters
-request body
-response status
-target service
+### 1. Clone the repository
 
-Example:
-{
-    "event_id": "...",
-    "timestamp": "...",
-    "user_id": "crapi-test-user",
-    "method": "GET",
-    "path": "/workshop/api/shop/products",
-    "endpoint": "/workshop/api/shop/products",
-    "query_parameters": {},
-    "request_body": null,
-    "response_status": 200,
-    "target_service": "crapi"
-}
+Clone the APIShield repository and move into the repository root:
 
-Authentication tokens are kept in memory by the traffic client and are not
-stored inside the APIEvent.
+```bash
+git clone <APIShield-repository-url>
+cd APIShield---API-Attacks-Detection
+```
 
+All APIShield commands below are run from this repository root.
 
-# OpenAPI Specification
+> If the repository directory has a different name after cloning, use that directory name instead.
 
-The current integration target is OWASP crAPI.
+### 2. Prepare the runtime environment
 
-The project uses the crAPI OpenAPI specification:
+APIShield uses Python for the conformance, traffic-generation, graph-building, training, and scoring components.
 
+Create and activate a Python virtual environment before installing the dependencies required by the repository:
+
+```bash
+python -m venv .venv
+```
+
+Activate it on Linux/macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+On Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Install the Python dependencies using the dependency file provided in the repository. For example, if the repository contains `requirements.txt`:
+
+```bash
+pip install -r requirements.txt
+```
+
+If the project uses a different dependency-management file, follow the corresponding instructions included in the repository.
+
+### 3. Start the crAPI target
+
+APIShield's documented traffic generators and live proxy target a local **OWASP crAPI** instance.
+
+The expected default target is:
+
+```text
+http://localhost:8888
+```
+
+Start the crAPI Docker environment supplied with the project and wait until the application is ready.
+
+Before continuing, verify that the crAPI service is reachable at port `8888`.
+
+The traffic generators require crAPI to be running. The vehicle workflow also uses MailHog on port `8025` unless `--skip-provision` is supplied.
+
+### 4. Verify the OpenAPI specification
+
+APIShield uses the crAPI OpenAPI specification to map concrete requests to operation templates.
+
+The expected project path is:
+
+```text
 targets/crAPI-main/openapi-spec/crapi-openapi-spec.json
+```
 
-The specification currently used by the integration tests is:
+The same specification is used by the behavioral graph-processing pipeline and the conformance branch.
 
-OpenAPI: 3.0.1
-Title: OWASP crAPI API
-Endpoints: 40
+Do not replace the specification with a different API specification unless you also update the corresponding target and configuration.
 
-The specification defines a bearer authentication scheme using JWT.
+### 5. Prepare test logins
 
-# OpenAPI Path Matching
+The traffic-generation utilities use:
 
-APIShield resolves incoming request paths against the OpenAPI paths.
+```text
+test_logins.json
+```
 
-The matcher supports parameterized paths such as:
+by default, relative to the repository.
 
-/identity/api/v2/user/videos/{video_id}
+If the login file is stored somewhere else, provide it explicitly using the generator's `--logins` option.
 
-and static paths such as:
+Do not commit real passwords, access tokens, or other credentials to GitHub.
 
-/workshop/api/shop/orders/all
+### 6. Generate normal traffic
 
-A specificity rule was added so that an exact/static path takes precedence
-over a parameterized path.
+Once crAPI is running, generate normal shop and vehicle sessions:
 
-For example:
+```bash
+python scripts/generate_normal_traffic.py \
+    --num-sessions 10 \
+    --delay-scale 1.0
+```
 
-/workshop/api/shop/orders/all
+For a faster demonstration, the documented setup also supports:
 
-must be matched before:
+```bash
+python scripts/generate_normal_traffic.py \
+    --num-sessions 10 \
+    --delay-scale 0.05 \
+    --skip-provision \
+    --shop-output data/raw/shop_sessions2.jsonl
+```
 
-/workshop/api/shop/orders/{order_id}
+The generators write OpenAPI-valid requests to JSONL files.
 
-when the request path is:
+### 7. Generate attack traffic
 
-/workshop/api/shop/orders/all
+Generate the attack scenarios individually.
 
-This prevents all from incorrectly being interpreted as an
-order_id.
+#### Enumeration
 
-A regression test is included for this behaviour.
+```bash
+python scripts/generate_attack_traffic.py \
+    --num-sessions 10 \
+    --attack enumeration \
+    --enum-output data/raw/shop_order_enumeration_2.jsonl
+```
 
-# Conformance Validation
+#### Mass flooding
 
-The validator currently checks multiple aspects of an API request against
-the OpenAPI specification.
+```bash
+python scripts/generate_attack_traffic.py \
+    --num-sessions 10 \
+    --attack flooder \
+    --flood-output data/raw/shop_order_flooder_2.jsonl
+```
 
-These include:
+#### BOLA
 
-endpoint/path matching
-HTTP method validity
-required parameters
-parameter types
-undocumented query parameters
-request-body schema validation
+`--max-targets` is required for the documented BOLA generator:
 
-The validator produces a structured conformance result containing:
+```bash
+python scripts/generate_attack_traffic.py \
+    --num-sessions 10 \
+    --attack bola \
+    --max-targets 5 \
+    --bola-output data/raw/shop_order_bola_2.jsonl
+```
 
-valid
-endpoint
-method
-violations
+#### BFLA
 
-Each violation contains information such as:
+```bash
+python scripts/generate_attack_traffic.py \
+    --num-sessions 10 \
+    --attack bfla \
+    --bfla-output data/raw/shop_workshop_bfla_2.jsonl
+```
 
-violation type
-message
-parameter
-location
-expected type
-actual value
-severity
-Severity
+The generators label traffic by the attack scenario rather than by HTTP status code. This is important because a malicious request can legitimately receive a `200`, `403`, `404`, or another response.
 
-The current conformance implementation assigns severity based on the type
-of contract violation.
+### 8. Build behavioral windows
 
-The current tested examples include:
+Before training the GINE model, convert the raw behavioral events into rolling graph windows:
 
-Violation	Severity
-Undocumented query parameter	Medium
-Invalid path parameter type	Medium
-Missing required parameter	High
-Invalid request body	High
-Unsupported/undefined HTTP method	High
+```bash
+python scripts/build_behavioral_windows.py
+```
 
-Severity is currently part of the conformance result and is intended to
-provide a basic indication of the security relevance of a contract
-violation.
+The documented pipeline reads the original raw files listed in the script's `DEFAULT_FILES` configuration and writes:
 
-# Real crAPI Integration
+```text
+data/processed/windows.jsonl
+```
 
-APIShield has been integrated with a running Dockerized crAPI deployment.
+The window configuration used by the training/batch pipeline is:
 
-The integration tests communicate with crAPI over HTTP rather than using
-only mocked responses.
+```text
+Window size: 16
+Stride:      8
+Idle gap:    60 seconds
+```
 
-The project has verified:
+Sessions should be partitioned before overlapping windows are created so that windows from the same session do not leak across train, validation, and test sets.
 
-Authenticated traffic
-TargetAPIClient
-      |
-      v
-crAPI login
-      |
-      v
-JWT
-      |
-      v
-Authenticated API request
-      |
-      v
-APIEvent
-Unauthenticated traffic
+### 9. Train the GINE model
 
-The client also supports endpoints that do not require authentication.
+Train the behavioral detector:
 
-When no JWT is present, the client does not add an Authorization header.
+```bash
+python scripts/train_behavioral_gnn.py
+```
 
-When a JWT is present, the client adds:
+The documented training procedure uses CPU training, Adam with learning rate `1e-3`, weighted binary cross-entropy, weighted sampling, validation PR-AUC for early stopping, and validation-based threshold selection.
 
-Authorization: Bearer <JWT>
+After successful training, the scoring interfaces expect the trained artifacts at:
 
-Both behaviours have been tested against the real crAPI deployment.
+```text
+data/processed/behavioral_gnn.pt
+data/processed/threshold.json
+```
 
-# Conformance Attack Tests
+The selected threshold in the documented experiment is approximately:
 
-The conformance branch has been tested against real crAPI traffic using
-five attack scenarios.
+```text
+0.5088
+```
 
-## Attack 1 — Undocumented Query Parameter
+### 10. Score a JSONL session file
 
-A request is sent with a query parameter that is not declared in the
-OpenAPI specification.
+For batch scoring:
 
-Example:
+```bash
+python scripts/score_behavioral_sessions.py \
+    --input data/raw/shop_order_enumeration_2.jsonl \
+    --output data/processed/Enumeration_testing.json
+```
 
-GET /workshop/api/shop/products?unexpected_parameter=attack-test
+The batch scorer uses train-style rolling windows:
 
-Expected result:
+```text
+Window size: 16
+Stride:      8
+Idle gap:    60 seconds
+```
 
-UNDOCUMENTED_PARAMETER
-Severity: medium
+Useful options include:
 
-## Attack 2 — Invalid Path Parameter Type
+```text
+--checkpoint
+--threshold
+--spec
+--window-size
+--stride
+--idle-gap
+```
 
-The OpenAPI specification defines:
+### 11. Run stream/replay detection
 
-video_id -> integer
+To process a JSONL file event-by-event:
 
-The test sends a non-integer value:
+```bash
+python scripts/score_behavioral_stream.py \
+    --input data/raw/shop_order_enumeration_2.jsonl
+```
 
-GET /identity/api/v2/user/videos/not-an-integer
+To display only detections:
 
-Expected result:
+```bash
+python scripts/score_behavioral_stream.py \
+    --input data/raw/shop_order_enumeration_2.jsonl \
+    --only-flags
+```
 
-INVALID_PARAMETER_TYPE
-Severity: medium
+The stream interface uses the latest 16 events and normally scores with stride 1 after the minimum number of events has been reached.
 
-## Attack 3 — Missing Required Query Parameter
+The documented default is:
 
-The OpenAPI specification defines required query parameters:
+```text
+min_events = 4
+stride = 1
+idle_gap = 60 seconds
+```
 
-limit
-offset
+### 12. Run the live APIShield proxy
 
-The test intentionally omits:
+Start the live reverse proxy:
 
-offset
+```bash
+python scripts/run_live_gnn_proxy.py
+```
 
-Expected result:
+By default:
 
-MISSING_REQUIRED_PARAMETER
-Parameter: offset
-Location: query
-Severity: high
+```text
+APIShield: http://localhost:8090
+crAPI:    http://localhost:8888
+```
 
-This test also exposed and led to the correction of a path-matching
-specificity issue involving:
+Point the React application, Postman, or another authorized API client to:
 
-/workshop/api/shop/orders/all
+```text
+http://localhost:8090
+```
 
-and:
+instead of directly using port `8888`.
 
-/workshop/api/shop/orders/{order_id}
+The live proxy:
 
-## Attack 4 — Invalid Request Body Type
+1. Receives the API request.
+2. Forwards it to crAPI.
+3. Captures the resulting API event.
+4. Adds the event to the session buffer.
+5. Builds a graph from the latest 16 events.
+6. Computes the behavioral score.
+7. Maintains the maximum session score.
 
-The login request body defines:
+Useful live-proxy defaults are:
 
-email -> string
-password -> string
+```text
+--target http://localhost:8888
+--port 8090
+--stride 1
+--min-events 4
+--idle-gap 0
+```
 
-The test intentionally sends an integer for email.
+The live proxy also exposes control endpoints that are not forwarded to crAPI:
 
-Example:
+```text
+GET http://localhost:8090/apishield/health
+GET http://localhost:8090/apishield/sessions
+```
 
-{
-    "email": 12345,
-    "password": "..."
-}
+The sessions endpoint reports the current `session_max` and flagged state for active session keys.
 
-Expected result:
+### 13. Understand live session identification
 
-INVALID_REQUEST_BODY
-Location: body
-Severity: high
+For live traffic, APIShield determines the session key in this order:
 
-This test also verified that the traffic client can send an
-unauthenticated request to the login endpoint.
+1. `X-APIShield-Session`
+2. JWT `email` / `sub` from the `Authorization: Bearer` header
+3. Client IP address
 
-## Attack 5 — Unsupported HTTP Method
+A login request does not yet contain a JWT, so a login and later authenticated requests can sometimes initially map to different keys unless an explicit `X-APIShield-Session` header is supplied.
 
-The OpenAPI specification defines operations for:
+For controlled experiments, using a stable session header can make session tracking easier.
 
-GET /workshop/api/shop/products
-POST /workshop/api/shop/products
+### 14. Run the conformance component
 
-The test sends:
+The conformance branch uses the OpenAPI specification to validate requests against the documented contract.
 
-DELETE /workshop/api/shop/products
+The core implementation is located under:
 
-The target API returns:
+```text
+src/apishield/conformance/
+```
 
-405 Method Not Allowed
+including:
 
-The APIShield conformance layer identifies this as a method-level contract
-violation.
+```text
+models.py
+path_matcher.py
+validator.py
+parameter_checker.py
+body_checker.py
+```
 
-Current result:
+The project also includes a conformance demonstration script:
 
-UNKNOWN_ENDPOINT
-Location: method
-Severity: high
+```text
+demo_conformance_traffic.py
+```
 
-The violation message identifies that the HTTP method is not defined for
-the endpoint.
+Use the repository's supplied demonstration/configuration when testing the conformance branch.
 
-# Testing
+Typical findings demonstrated by the project include:
 
-The project currently has a unit and integration test suite.
+- Undocumented query parameters
+- Invalid path parameter types
+- Missing required parameters
+- Invalid request-body types
+- Unsupported methods / unknown endpoints
 
-At the current checkpoint:
+### 15. Recommended first successful test
 
-31 tests passed
+For a first-time user, the easiest validation sequence is:
 
-The test suite covers:
+```text
+1. Start crAPI
+       ↓
+2. Verify localhost:8888
+       ↓
+3. Activate the Python environment
+       ↓
+4. Generate a small normal dataset
+       ↓
+5. Generate a small enumeration dataset
+       ↓
+6. Build behavioral windows
+       ↓
+7. Train the GINE model
+       ↓
+8. Run the batch scorer
+       ↓
+9. Run the stream scorer
+       ↓
+10. Start the live proxy
+       ↓
+11. Send authorized requests through :8090
+```
 
-API event models
-request interception
-middleware
-normalization
-OpenAPI loading
-path matching
-conformance validation
-dataset-related components already implemented
-crAPI OpenAPI integration
-crAPI path matching
-crAPI authenticated traffic
-crAPI unauthenticated traffic
-real conformance attack scenarios
-traffic client authentication behaviour
+Start with a small number of sessions while validating the installation. Increase the dataset size only after the complete pipeline works.
 
-Run the complete test suite with:
+### 16. Troubleshooting checklist
 
-pytest
+If APIShield does not work on the first run, check the following in order:
 
-A successful run should report:
+**crAPI is unavailable**
 
-31 passed
+```text
+Expected target: http://localhost:8888
+```
 
-The exact number may increase as new project functionality is added.
+Make sure the crAPI Docker environment is running before starting traffic generation or the live proxy.
 
-# Project Structure
+**Missing model artifacts**
 
-The current project is organized approximately as follows:
+The scoring interfaces expect:
 
-APIShield/
-│
-├── src/
-│   └── apishield/
-│       │
-│       ├── ingestion/
-│       │   └── models.py
-│       │
-│       ├── conformance/
-│       │   ├── body_checker.py
-│       │   ├── parameter_checker.py
-│       │   ├── path_matcher.py
-│       │   ├── validator.py
-│       │   └── ...
-│       │
-│       └── traffic/
-│           ├── client.py
-│           └── workflows.py
-│
-├── tests/
-│   ├── unit/
-│   └── integration/
-│
-├── targets/
-│   └── crAPI-main/
-│
-├── data/
-│   ├── raw/
-│   ├── processed/
-│   └── graphs/
-│
-├── pyproject.toml
-├── .gitignore
-└── README.md
+```text
+data/processed/behavioral_gnn.pt
+data/processed/threshold.json
+```
 
-The behavioural/GNN components will be added in subsequent development
-phases.
+Run the behavioral-window build and training steps before scoring.
 
-# Environment
+**Wrong OpenAPI specification**
 
-APIShield is currently developed and tested using Python 3.13.
+Verify:
 
-A Python virtual environment is recommended.
+```text
+targets/crAPI-main/openapi-spec/crapi-openapi-spec.json
+```
 
-Create the environment:
+**No behavioral score appears**
 
-python -m venv .venv
+For stream/live scoring, fewer than four events do not produce a score by default.
 
-Activate it on Windows:
+**Live proxy appears slow**
 
-.venv\Scripts\activate
+The documented live configuration uses `--idle-gap 0`. Do not increase the idle gap without understanding how it changes session splitting.
 
-Install the project dependencies according to pyproject.toml.
+**Vehicle traffic generation fails**
 
-The project uses packages including:
+The vehicle workflow requires MailHog on port `8025` unless `--skip-provision` is used.
 
-FastAPI
-HTTPX
-Pydantic
-JSON Schema
-NetworkX
-NumPy
-Pandas
-OpenAPI specification validation tooling
-PyYAML
-Uvicorn
-python-dotenv
-crAPI
+**BOLA generation fails**
 
-The current integration target is OWASP crAPI running through Docker
-Compose.
+Make sure `--max-targets` is supplied and that the target crAPI instance contains the required account/order data.
 
-The crAPI deployment is used as a realistic API target for:
+**Session continuity looks incorrect**
 
-authenticated traffic
-unauthenticated traffic
-OpenAPI specification validation
-malformed request testing
-conformance attack testing
+Use an explicit `X-APIShield-Session` header for controlled live testing, or verify the JWT/session-key behavior described above.
 
-The target deployment should be running before executing tests that require
-live crAPI traffic.
+### 17. Safety reminder
 
-# Current Development Checkpoint
+The attack generators intentionally produce security-testing traffic such as enumeration, flooding, BOLA, and BFLA patterns.
 
-The OpenAPI conformance branch is currently considered the first completed
-baseline of APIShield.
+Run them only against the local crAPI instance or another system for which you have explicit authorization.
 
-The following pipeline has been demonstrated:
+Never point these generators at a production API or a third-party service without permission.
 
-Real crAPI Request
-       |
-       v
-TargetAPIClient
-       |
-       v
-APIEvent
-       |
-       v
-OpenAPIPathMatcher
-       |
-       v
-OpenAPIValidator
-       |
-       v
-ConformanceResult
-       |
-       v
-Violation + Severity
+## Security and Data Handling
 
-The branch has been validated using real requests against Dockerized crAPI.
+Use the traffic generators only against systems for which you have explicit authorization.
 
-# Next Development Phase
+Do not commit real credentials, tokens, secrets, or sensitive traffic logs to the repository. Generated examples should use controlled local test data.
 
-The next phase is the Behavioural / GNN branch.
+## Research Context
 
-The planned pipeline is:
+APIShield is a research prototype for studying the combination of:
 
-Normal crAPI User Traffic
-          |
-          v
-       APIEvents
-          |
-          v
-    User Sequences
-          |
-          v
-   Per-user Call Graphs
-          |
-          v
-    Graph Features
-          |
-          v
-         GNN
-          |
-          v
- Behavioural Anomaly Score
+- API specification conformance
+- Runtime API behavior
+- Rolling call-graph representations
+- Graph neural networks
+- API attack detection
 
-The behavioural branch will initially focus on generating legitimate,
-normal-user API traffic.
+The central idea is to combine **what the API contract permits** with **how the API is actually used over time**.
 
-The resulting traffic will form the basis for constructing per-user API
-call graphs before introducing graph-based anomaly detection.
+## Citation
 
-# CrAPI Setup
+If you use APIShield in academic work, cite the associated research paper once its final publication details are available.
 
-## Clone APIShield
-git clone <YOUR-GITHUB-REPO-URL>
-cd APIShield
+## Disclaimer
 
-## Create Python environment
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-## Install APIShield
-python -m pip install --upgrade pip
-pip install -e .
-
-## Download OWASP crAPI
-mkdir targets
-cd targets
-curl.exe -L -o crapi.zip https://github.com/OWASP/crAPI/archive/refs/heads/main.zip
-tar -xf .\crapi.zip
-cd ..
-
-## Start crAPI with Docker
-cd targets\crAPI-main\deploy\docker
-docker compose pull
-docker compose -f docker-compose.yml --compatibility up -d
-
-## Return to APIShield
-cd ..\..\..\..
-
-## Run APIShield tests
-pytest
+APIShield is an experimental security framework. Detection performance depends on the API specification, traffic characteristics, training data, and deployment environment. The reported evaluation uses controlled traffic and does not guarantee production-grade detection performance.
