@@ -1,21 +1,26 @@
+
 from typing import Any
-from jsonschema import Draft202012Validator
+
+from jsonschema import Draft202012Validator, RefResolver
+
 from apishield.ingestion.models import APIEvent
-from .models import (
-    ConformanceViolation,
-    ViolationType,
-)
+from .models import ConformanceViolation, ViolationType
+
 
 class RequestBodyChecker:
     """
     Validates an APIEvent request body against the JSON Schema
     declared by an OpenAPI operation.
+
+    The full OpenAPI specification is supplied so local references
+    such as #/components/schemas/ProductQuantity can be resolved.
     """
 
     def check(
         self,
         event: APIEvent,
         operation: dict[str, Any],
+        specification: dict[str, Any],
     ) -> list[ConformanceViolation]:
 
         request_body_definition = operation.get("requestBody")
@@ -35,11 +40,9 @@ class RequestBodyChecker:
                         severity="high",
                     )
                 ]
-
             return []
 
         content = request_body_definition.get("content", {})
-
         json_content = content.get("application/json")
 
         if json_content is None:
@@ -50,24 +53,27 @@ class RequestBodyChecker:
         if schema is None:
             return []
 
-        validator = Draft202012Validator(schema)
+        # Resolve local OpenAPI references against the entire spec.
+        resolver = RefResolver.from_schema(specification)
+
+        validator = Draft202012Validator(
+            schema,
+            resolver=resolver,
+        )
+
         violations: list[ConformanceViolation] = []
 
         for error in validator.iter_errors(event.request_body):
             parameter = None
 
             if error.validator == "additionalProperties":
-                additional_properties = error.message
-
                 parameter = self._extract_additional_property(
-                    additional_properties
+                    error.message
                 )
 
             violations.append(
                 ConformanceViolation(
-                    violation_type=(
-                        ViolationType.INVALID_REQUEST_BODY
-                    ),
+                    violation_type=ViolationType.INVALID_REQUEST_BODY,
                     message=error.message,
                     parameter=parameter,
                     location="body",
@@ -82,11 +88,7 @@ class RequestBodyChecker:
         message: str,
     ) -> str | None:
         """
-        Extract the field name from a JSON Schema
-        additionalProperties error message.
-
-        Example:
-            Additional properties are not allowed ('is_admin' was unexpected)
+        Extract a field name from an additionalProperties error.
         """
 
         marker = "('"

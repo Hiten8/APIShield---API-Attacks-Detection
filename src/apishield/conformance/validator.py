@@ -80,6 +80,7 @@ class OpenAPIValidator:
             self.body_checker.check(
                 event=event,
                 operation=operation,
+                specification=self.specification,
             )
         )
 
